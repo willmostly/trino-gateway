@@ -56,22 +56,27 @@ public class QueryIdCachingProxyHandler extends ProxyHandler {
   private final Meter requestMeter;
   private final int serverApplicationPort;
   private final List<String> extraWhitelistPaths;
+  private final List<String> extraStatementPaths;
+
 
   public QueryIdCachingProxyHandler(
       QueryHistoryManager queryHistoryManager,
       RoutingManager routingManager,
       RoutingGroupSelector routingGroupSelector,
       int serverApplicationPort,
-      Meter requestMeter, List<String> extraWhitelistPaths) {
+      Meter requestMeter,
+      List<String> extraWhitelistPaths,
+      List<String> extraStatementPaths) {
     this.requestMeter = requestMeter;
     this.routingManager = routingManager;
     this.routingGroupSelector = routingGroupSelector;
     this.queryHistoryManager = queryHistoryManager;
     this.serverApplicationPort = serverApplicationPort;
     this.extraWhitelistPaths = extraWhitelistPaths;
+    this.extraStatementPaths = extraStatementPaths;
   }
 
-  protected static String extractQueryIdIfPresent(String path, String queryParams) {
+  protected String extractQueryIdIfPresent(String path, String queryParams) {
     if (path == null) {
       return null;
     }
@@ -90,7 +95,8 @@ public class QueryIdCachingProxyHandler extends ProxyHandler {
           queryId = tokens[3];
         }
       }
-    } else if (path.startsWith(TRINO_UI_PATH)) {
+    } else if (path.startsWith(TRINO_UI_PATH) ||
+            extraStatementPaths.stream().anyMatch(s -> path.startsWith(s))) {
       Matcher matcher = QUERY_ID_PATTERN.matcher(path);
       if (matcher.matches()) {
         queryId = matcher.group(1);
@@ -192,7 +198,9 @@ public class QueryIdCachingProxyHandler extends ProxyHandler {
   @Override
   public void preConnectionHook(HttpServletRequest request, Request proxyRequest) {
     if (request.getMethod().equals(HttpMethod.POST)
-        && request.getRequestURI().startsWith(V1_STATEMENT_PATH)) {
+        && (request.getRequestURI().startsWith(V1_STATEMENT_PATH)
+            || extraStatementPaths.stream().anyMatch(
+                    s -> request.getRequestURI().startsWith(s)))){
       requestMeter.mark();
       try {
         String requestBody = CharStreams.toString(request.getReader());
@@ -220,7 +228,8 @@ public class QueryIdCachingProxyHandler extends ProxyHandler {
         || path.startsWith(V1_NODE_PATH)
         || path.startsWith(UI_API_STATS_PATH)
         || path.startsWith(OAUTH_PATH)
-        || extraWhitelistPaths.stream().anyMatch(s -> path.startsWith(s));
+        || extraWhitelistPaths.stream().anyMatch(s -> path.startsWith(s))
+        || extraStatementPaths.stream().anyMatch(s -> path.startsWith(s));
   }
 
   public boolean isAuthEnabled() {
@@ -290,7 +299,8 @@ public class QueryIdCachingProxyHandler extends ProxyHandler {
       Callback callback) {
     try {
       String requestPath = request.getRequestURI();
-      if (requestPath.startsWith(V1_STATEMENT_PATH)
+      if ((requestPath.startsWith(V1_STATEMENT_PATH)
+              || extraStatementPaths.stream().anyMatch(s -> requestPath.startsWith(s)))
           && request.getMethod().equals(HttpMethod.POST)) {
         String output;
         boolean isGZipEncoding = isGZipEncoding(response);

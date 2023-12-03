@@ -23,4 +23,5 @@ public class HaGatewayConfiguration extends AppConfiguration {
   private BackendStateConfiguration backendState;
   private ClusterStatsConfiguration clusterStatsConfiguration;
   private List<String> extraWhitelistPaths = new ArrayList<>();
+  private List<String> extraStatementPaths = new ArrayList<>();
 }

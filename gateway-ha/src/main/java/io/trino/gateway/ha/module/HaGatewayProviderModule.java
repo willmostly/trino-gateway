@@ -60,6 +60,7 @@ public class HaGatewayProviderModule extends AppModule<HaGatewayConfiguration, E
   private final BackendStateManager backendStateConnectionManager;
   private final AuthFilter authenticationFilter;
   private final List<String> extraWhitelistPaths;
+  private final List<String> extraStatementPaths;
 
   public HaGatewayProviderModule(HaGatewayConfiguration configuration, Environment environment) {
     super(configuration, environment);
@@ -81,6 +82,7 @@ public class HaGatewayProviderModule extends AppModule<HaGatewayConfiguration, E
     authenticationFilter = getAuthFilter(configuration);
     backendStateConnectionManager = new BackendStateManager(configuration.getBackendState());
     extraWhitelistPaths = configuration.getExtraWhitelistPaths();
+    extraStatementPaths = configuration.getExtraStatementPaths();
   }
 
   private LbOAuthManager getOAuthManager(HaGatewayConfiguration configuration) {
@@ -159,7 +161,8 @@ public class HaGatewayProviderModule extends AppModule<HaGatewayConfiguration, E
         routingGroupSelector,
         getApplicationPort(),
         requestMeter,
-        extraWhitelistPaths);
+        extraWhitelistPaths,
+        extraStatementPaths);
   }
 
   protected AuthFilter getAuthFilter(HaGatewayConfiguration configuration) {
