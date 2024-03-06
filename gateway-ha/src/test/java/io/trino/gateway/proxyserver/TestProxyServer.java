@@ -13,6 +13,7 @@
  */
 package io.trino.gateway.proxyserver;
 
+import io.trino.gateway.ha.customize.NoopRequestBodyCustomizer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ public class TestProxyServer
         config.setName("test_cluster");
         config.setProxyTo("http://localhost:" + trinoPort);
         config.setLocalPort(proxyPort);
-        proxy = new ProxyServer(config, new ProxyHandler());
+        proxy = new ProxyServer(config, new ProxyHandler(), new NoopRequestBodyCustomizer());
         proxy.start();
     }
 
@@ -61,8 +62,7 @@ public class TestProxyServer
     public void testProxyServer()
             throws Exception
     {
-        try (Connection connection = DriverManager.getConnection("jdbc:trino://localhost:" + proxyPort, "test_user", null);
-                Statement statement = connection.createStatement()) {
+        try (Connection connection = DriverManager.getConnection("jdbc:trino://localhost:" + proxyPort, "test_user", null); Statement statement = connection.createStatement()) {
             ResultSet result = statement.executeQuery("SELECT 'test'");
             result.next();
             assertThat(result.getString(1)).isEqualTo("test");

@@ -28,6 +28,8 @@ import io.trino.gateway.ha.config.HaGatewayConfiguration;
 import io.trino.gateway.ha.config.RequestRouterConfiguration;
 import io.trino.gateway.ha.config.RoutingRulesConfiguration;
 import io.trino.gateway.ha.config.UserConfiguration;
+import io.trino.gateway.ha.customize.RequestBodyCustomizer;
+import io.trino.gateway.ha.customize.RequestBodyCustomizerFactory;
 import io.trino.gateway.ha.handler.QueryIdCachingProxyHandler;
 import io.trino.gateway.ha.persistence.JdbcConnectionManager;
 import io.trino.gateway.ha.router.BackendStateManager;
@@ -65,6 +67,7 @@ import java.util.Map;
 public class HaGatewayProviderModule
         extends AppModule<HaGatewayConfiguration, Environment>
 {
+    private final RequestBodyCustomizerFactory requestBodyCustomizerFactory = new RequestBodyCustomizerFactory();
     private final ResourceGroupsManager resourceGroupsManager;
     private final GatewayBackendManager gatewayBackendManager;
     private final QueryHistoryManager queryHistoryManager;
@@ -74,6 +77,8 @@ public class HaGatewayProviderModule
     private final LbFormAuthManager formAuthManager;
     private final AuthorizationManager authorizationManager;
     private final BackendStateManager backendStateConnectionManager;
+    private final RequestBodyCustomizer requestBodyCustomizer;
+    private final boolean customizeRequestBody;
     private final AuthFilter authenticationFilter;
     private final List<String> extraWhitelistPaths;
 
@@ -85,17 +90,17 @@ public class HaGatewayProviderModule
         resourceGroupsManager = new HaResourceGroupsManager(connectionManager);
         gatewayBackendManager = new HaGatewayManager(jdbi);
         queryHistoryManager = new HaQueryHistoryManager(jdbi);
-        routingManager =
-                new HaRoutingManager(gatewayBackendManager, queryHistoryManager);
+        routingManager = new HaRoutingManager(gatewayBackendManager, queryHistoryManager);
 
         Map<String, UserConfiguration> presetUsers = configuration.getPresetUsers();
 
         oauthManager = getOAuthManager(configuration);
         formAuthManager = getFormAuthManager(configuration);
 
-        authorizationManager = new AuthorizationManager(configuration.getAuthorization(),
-                presetUsers);
+        authorizationManager = new AuthorizationManager(configuration.getAuthorization(), presetUsers);
         authenticationFilter = getAuthFilter(configuration);
+        customizeRequestBody = configuration.getRequestBodyCustomizerConfiguration().isEnabled();
+        requestBodyCustomizer = requestBodyCustomizerFactory.getRequestBodyCustomizer(configuration.getRequestBodyCustomizerConfiguration());
         backendStateConnectionManager = new BackendStateManager();
         extraWhitelistPaths = configuration.getExtraWhitelistPaths();
     }
@@ -103,8 +108,7 @@ public class HaGatewayProviderModule
     private LbOAuthManager getOAuthManager(HaGatewayConfiguration configuration)
     {
         AuthenticationConfiguration authenticationConfiguration = configuration.getAuthentication();
-        if (authenticationConfiguration != null
-                && authenticationConfiguration.getOauth() != null) {
+        if (authenticationConfiguration != null && authenticationConfiguration.getOauth() != null) {
             return new LbOAuthManager(authenticationConfiguration.getOauth());
         }
         return null;
@@ -113,45 +117,24 @@ public class HaGatewayProviderModule
     private LbFormAuthManager getFormAuthManager(HaGatewayConfiguration configuration)
     {
         AuthenticationConfiguration authenticationConfiguration = configuration.getAuthentication();
-        if (authenticationConfiguration != null
-                && authenticationConfiguration.getForm() != null) {
-            return new LbFormAuthManager(authenticationConfiguration.getForm(),
-                    configuration.getPresetUsers());
+        if (authenticationConfiguration != null && authenticationConfiguration.getForm() != null) {
+            return new LbFormAuthManager(authenticationConfiguration.getForm(), configuration.getPresetUsers());
         }
         return null;
     }
 
-    private ChainedAuthFilter getAuthenticationFilters(AuthenticationConfiguration config,
-            Authorizer<LbPrincipal> authorizer)
+    private ChainedAuthFilter getAuthenticationFilters(AuthenticationConfiguration config, Authorizer<LbPrincipal> authorizer)
     {
         List<AuthFilter> authFilters = new ArrayList<>();
         String defaultType = config.getDefaultType();
         if (oauthManager != null) {
-            authFilters.add(new LbFilter.Builder<LbPrincipal>()
-                    .setAuthenticator(new LbAuthenticator(oauthManager,
-                            authorizationManager))
-                    .setAuthorizer(authorizer)
-                    .setUnauthorizedHandler(new LbUnauthorizedHandler(defaultType))
-                    .setPrefix("Bearer")
-                    .buildAuthFilter());
+            authFilters.add(new LbFilter.Builder<LbPrincipal>().setAuthenticator(new LbAuthenticator(oauthManager, authorizationManager)).setAuthorizer(authorizer).setUnauthorizedHandler(new LbUnauthorizedHandler(defaultType)).setPrefix("Bearer").buildAuthFilter());
         }
 
         if (formAuthManager != null) {
-            authFilters.add(new LbFilter.Builder<LbPrincipal>()
-                    .setAuthenticator(new FormAuthenticator(formAuthManager,
-                            authorizationManager))
-                    .setAuthorizer(authorizer)
-                    .setUnauthorizedHandler(new LbUnauthorizedHandler(defaultType))
-                    .setPrefix("Bearer")
-                    .buildAuthFilter());
+            authFilters.add(new LbFilter.Builder<LbPrincipal>().setAuthenticator(new FormAuthenticator(formAuthManager, authorizationManager)).setAuthorizer(authorizer).setUnauthorizedHandler(new LbUnauthorizedHandler(defaultType)).setPrefix("Bearer").buildAuthFilter());
 
-            authFilters.add(new BasicCredentialAuthFilter.Builder<LbPrincipal>()
-                    .setAuthenticator(new ApiAuthenticator(formAuthManager,
-                            authorizationManager))
-                    .setAuthorizer(authorizer)
-                    .setUnauthorizedHandler(new LbUnauthorizedHandler(defaultType))
-                    .setPrefix("Basic")
-                    .buildAuthFilter());
+            authFilters.add(new BasicCredentialAuthFilter.Builder<LbPrincipal>().setAuthenticator(new ApiAuthenticator(formAuthManager, authorizationManager)).setAuthorizer(authorizer).setUnauthorizedHandler(new LbUnauthorizedHandler(defaultType)).setPrefix("Basic").buildAuthFilter());
         }
 
         return new ChainedAuthFilter(authFilters);
@@ -159,10 +142,7 @@ public class HaGatewayProviderModule
 
     protected ProxyHandler getProxyHandler()
     {
-        Meter requestMeter =
-                getEnvironment()
-                        .metrics()
-                        .meter(getConfiguration().getRequestRouter().getName() + ".requests");
+        Meter requestMeter = getEnvironment().metrics().meter(getConfiguration().getRequestRouter().getName() + ".requests");
 
         // By default, use routing group header to route
         RoutingGroupSelector routingGroupSelector = RoutingGroupSelector.byRoutingGroupHeader();
@@ -173,20 +153,13 @@ public class HaGatewayProviderModule
             routingGroupSelector = RoutingGroupSelector.byRoutingRulesEngine(rulesConfigPath);
         }
 
-        return new QueryIdCachingProxyHandler(
-                getQueryHistoryManager(),
-                getRoutingManager(),
-                routingGroupSelector,
-                getApplicationPort(),
-                requestMeter,
-                extraWhitelistPaths);
+        return new QueryIdCachingProxyHandler(getQueryHistoryManager(), getRoutingManager(), routingGroupSelector, getApplicationPort(), requestMeter, extraWhitelistPaths);
     }
 
     protected AuthFilter getAuthFilter(HaGatewayConfiguration configuration)
     {
         AuthorizationConfiguration authorizationConfig = configuration.getAuthorization();
-        Authorizer<LbPrincipal> authorizer = (authorizationConfig != null)
-                ? new LbAuthorizer(authorizationConfig) : new NoopAuthorizer();
+        Authorizer<LbPrincipal> authorizer = (authorizationConfig != null) ? new LbAuthorizer(authorizationConfig) : new NoopAuthorizer();
 
         AuthenticationConfiguration authenticationConfig = configuration.getAuthentication();
 
@@ -194,10 +167,7 @@ public class HaGatewayProviderModule
             return getAuthenticationFilters(authenticationConfig, authorizer);
         }
 
-        return new NoopFilter.Builder<LbPrincipal>()
-                .setAuthenticator(new NoopAuthenticator())
-                .setAuthorizer(authorizer)
-                .buildAuthFilter();
+        return new NoopFilter.Builder<LbPrincipal>().setAuthenticator(new NoopAuthenticator()).setAuthorizer(authorizer).buildAuthFilter();
     }
 
     @Provides
@@ -224,7 +194,12 @@ public class HaGatewayProviderModule
             routerProxyConfig.setRequestBufferSize(routerConfiguration.getRequestBufferSize());
             routerProxyConfig.setResponseHeaderSize(routerConfiguration.getResponseBufferSize());
             ProxyHandler proxyHandler = getProxyHandler();
-            gateway = new ProxyServer(routerProxyConfig, proxyHandler);
+            if (customizeRequestBody) {
+                gateway = new ProxyServer(routerProxyConfig, proxyHandler, requestBodyCustomizer);
+            }
+            else {
+                gateway = new ProxyServer(routerProxyConfig, proxyHandler);
+            }
         }
         return gateway;
     }

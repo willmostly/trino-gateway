@@ -13,6 +13,8 @@
  */
 package io.trino.gateway.proxyserver;
 
+import io.trino.gateway.ha.customize.NoopRequestBodyCustomizer;
+import io.trino.gateway.ha.customize.RequestBodyCustomizer;
 import jakarta.servlet.DispatcherType;
 import org.eclipse.jetty.http.HttpScheme;
 import org.eclipse.jetty.proxy.ConnectHandler;
@@ -43,19 +45,27 @@ public class ProxyServer
     private final ProxyServletImpl proxy;
     private final ProxyHandler proxyHandler;
     private ServletContextHandler context;
+    private RequestBodyCustomizer requestBodyCustomizer;
+    private boolean customizeRequestBody;
 
     public ProxyServer(ProxyServerConfiguration config, ProxyHandler proxyHandler)
     {
-        this(config, proxyHandler, new ProxyServletImpl());
+        this(config, proxyHandler, new ProxyServletImpl(), new NoopRequestBodyCustomizer());
+        customizeRequestBody = false;
     }
 
-    public ProxyServer(ProxyServerConfiguration config, ProxyHandler proxyHandler,
-            ProxyServletImpl proxy)
+    public ProxyServer(ProxyServerConfiguration config, ProxyHandler proxyHandler, RequestBodyCustomizer requestBodyCustomizer)
+    {
+        this(config, proxyHandler, new ProxyServletImpl(), requestBodyCustomizer);
+    }
+
+    public ProxyServer(ProxyServerConfiguration config, ProxyHandler proxyHandler, ProxyServletImpl proxy, RequestBodyCustomizer requestBodyCustomizer)
     {
         this.server = new Server();
         this.server.setStopAtShutdown(true);
         this.proxy = proxy;
         this.proxyHandler = proxyHandler;
+        this.requestBodyCustomizer = requestBodyCustomizer;
 
         this.proxy.setServerConfig(config);
         this.setupContext(config);
@@ -93,10 +103,7 @@ public class ProxyServer
             httpConfiguration.addCustomizer(src);
 
             HttpConnectionFactory connectionFactory = new HttpConnectionFactory(httpConfiguration);
-            connector = new ServerConnector(
-                    server,
-                    new SslConnectionFactory(sslContextFactory, connectionFactory.getProtocol()),
-                    connectionFactory);
+            connector = new ServerConnector(server, new SslConnectionFactory(sslContextFactory, connectionFactory.getProtocol()), connectionFactory);
         }
         else {
             connector = new ServerConnector(server, new HttpConnectionFactory(httpConfiguration));
@@ -115,6 +122,10 @@ public class ProxyServer
             proxy.setProxyHandler(proxyHandler);
         }
 
+        if (customizeRequestBody) {
+            proxy.setRequestBodyCustomizer(requestBodyCustomizer);
+        }
+
         ServletHolder proxyServlet = new ServletHolder(config.getName(), proxy);
 
         proxyServlet.setInitParameter("proxyTo", config.getProxyTo());
@@ -123,8 +134,7 @@ public class ProxyServer
         proxyServlet.setInitParameter("preserveHost", config.getPreserveHost());
 
         // Setup proxy servlet
-        this.context =
-                new ServletContextHandler(proxyConnectHandler, "/", ServletContextHandler.SESSIONS);
+        this.context = new ServletContextHandler(proxyConnectHandler, "/", ServletContextHandler.SESSIONS);
         this.context.addServlet(proxyServlet, "/*");
         this.context.addFilter(RequestFilter.class, "/*", EnumSet.allOf(DispatcherType.class));
     }

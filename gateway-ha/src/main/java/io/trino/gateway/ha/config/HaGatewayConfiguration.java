@@ -34,8 +34,11 @@ public class HaGatewayConfiguration
     private BackendStateConfiguration backendState;
     private ClusterStatsConfiguration clusterStatsConfiguration;
     private List<String> extraWhitelistPaths = new ArrayList<>();
+    private RequestBodyCustomizerConfiguration requestBodyCustomizerConfiguration = new RequestBodyCustomizerConfiguration();
 
-    public HaGatewayConfiguration() {}
+    public HaGatewayConfiguration()
+    {
+    }
 
     public RequestRouterConfiguration getRequestRouter()
     {
@@ -145,5 +148,15 @@ public class HaGatewayConfiguration
     public void setExtraWhitelistPaths(List<String> extraWhitelistPaths)
     {
         this.extraWhitelistPaths = extraWhitelistPaths;
+    }
+
+    public RequestBodyCustomizerConfiguration getRequestBodyCustomizerConfiguration()
+    {
+        return requestBodyCustomizerConfiguration;
+    }
+
+    public void setRequestBodyCustomizerConfiguration(RequestBodyCustomizerConfiguration requestBodyCustomizerConfiguration)
+    {
+        this.requestBodyCustomizerConfiguration = requestBodyCustomizerConfiguration;
     }
 }
