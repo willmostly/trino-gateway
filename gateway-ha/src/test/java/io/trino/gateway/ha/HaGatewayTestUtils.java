@@ -104,7 +104,6 @@ public class HaGatewayTestUtils
                                 "APPLICATION_CONNECTOR_PORT", String.valueOf(30000 + (int) (Math.random() * 1000)))
                         .replace("ADMIN_CONNECTOR_PORT", String.valueOf(31000 + (int) (Math.random() * 1000)))
                         .replace("LOCALHOST_JKS", Paths.get(resource.toURI()).toFile().getAbsolutePath());
-
         File target = File.createTempFile("config-" + System.currentTimeMillis(), "config.yaml");
 
         FileWriter fw = new FileWriter(target, UTF_8);
