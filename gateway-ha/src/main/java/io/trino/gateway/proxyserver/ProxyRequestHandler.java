@@ -147,7 +147,8 @@ public class ProxyRequestHandler
         for (String name : list(servletRequest.getHeaderNames())) {
             for (String value : list(servletRequest.getHeaders(name))) {
                 // TODO: decide what should and shouldn't be forwarded
-                if (!name.equalsIgnoreCase("Accept-Encoding") && !name.equalsIgnoreCase("Host")) {
+                if (!name.equalsIgnoreCase("Accept-Encoding") && !name.equalsIgnoreCase("Host")
+                        && (addXForwardedHeaders || !name.startsWith("X-Forwarded"))) {
                     requestBuilder.addHeader(name, value);
                 }
             }
@@ -163,6 +164,10 @@ public class ProxyRequestHandler
                 .setPreserveAuthorizationOnRedirect(true)
                 .setFollowRedirects(false)
                 .build();
+
+        log.info("Outgoing request headers:");
+        request.getHeaders().forEach((name, value) -> log.info("%s : %s", name, value));
+        log.info(request.toString());
 
         FluentFuture<ProxyResponse> future = executeHttp(request);
 

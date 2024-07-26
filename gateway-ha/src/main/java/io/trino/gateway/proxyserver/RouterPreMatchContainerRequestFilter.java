@@ -14,6 +14,7 @@
 package io.trino.gateway.proxyserver;
 
 import com.google.inject.Inject;
+import io.airlift.log.Logger;
 import io.trino.gateway.ha.handler.RoutingTargetHandler;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -33,6 +34,7 @@ import static java.util.Objects.requireNonNull;
 public class RouterPreMatchContainerRequestFilter
         implements ContainerRequestFilter
 {
+    Logger log = Logger.get(RouterPreMatchContainerRequestFilter.class);
     public static final String ROUTE_TO_BACKEND = "/trino-gateway/internal/route_to_backend";
 
     private final RoutingTargetHandler routingTargetHandler;
@@ -47,6 +49,9 @@ public class RouterPreMatchContainerRequestFilter
     public void filter(ContainerRequestContext request)
             throws IOException
     {
+        log.info("Incoming request headers");
+        request.getHeaders().forEach((name, value) -> log.info("%s : %s", name, value));
+        log.info(request.getUriInfo().getRequestUri().toString());
         if (routingTargetHandler.isPathWhiteListed(request.getUriInfo().getRequestUri().getPath())) {
             request.setRequestUri(URI.create(ROUTE_TO_BACKEND));
         }
