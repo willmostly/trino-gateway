@@ -54,6 +54,8 @@ public class QueryCountBasedRouter
 
         LocalStats(ClusterStats stats)
         {
+            log.debug("Building LocalStats from: {}", stats.toString());
+
             clusterId = stats.clusterId();
             runningQueryCount = stats.runningQueryCount();
             queuedQueryCount = stats.queuedQueryCount();
@@ -186,10 +188,15 @@ public class QueryCountBasedRouter
     private synchronized Optional<LocalStats> getClusterToRoute(String user, String routingGroup)
     {
         log.debug("sorting cluster stats for {} {}", user, routingGroup);
+        if (log.isDebugEnabled()) {
+            for (LocalStats localStats : clusterStats) {
+                log.debug("RG: {}, ID:{}, healthy:{}", localStats.routingGroup, localStats.clusterId, localStats.healthy);
+            }
+        }
         List<LocalStats> filteredList = clusterStats.stream()
-                    .filter(stats -> stats.healthy())
-                    .filter(stats -> routingGroup.equals(stats.routingGroup()))
-                    .collect(Collectors.toList());
+                .filter(stats -> stats.healthy())
+                .filter(stats -> routingGroup.equals(stats.routingGroup()))
+                .collect(Collectors.toList());
 
         if (filteredList.isEmpty()) {
             return Optional.empty();
