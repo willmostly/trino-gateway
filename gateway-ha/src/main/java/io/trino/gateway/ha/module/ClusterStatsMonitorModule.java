@@ -20,6 +20,7 @@ import io.airlift.http.client.HttpClient;
 import io.trino.gateway.ha.clustermonitor.ClusterStatsHttpMonitor;
 import io.trino.gateway.ha.clustermonitor.ClusterStatsInfoApiMonitor;
 import io.trino.gateway.ha.clustermonitor.ClusterStatsJdbcMonitor;
+import io.trino.gateway.ha.clustermonitor.ClusterStatsMetricsMonitor;
 import io.trino.gateway.ha.clustermonitor.ClusterStatsMonitor;
 import io.trino.gateway.ha.clustermonitor.ForMonitor;
 import io.trino.gateway.ha.clustermonitor.NoopClusterStatsMonitor;
@@ -51,6 +52,7 @@ public class ClusterStatsMonitorModule
             case UI_API -> new ClusterStatsHttpMonitor(config.getBackendState());
             case JDBC -> new ClusterStatsJdbcMonitor(config.getBackendState(), config.getMonitor());
             case NOOP -> new NoopClusterStatsMonitor();
+            case METRICS -> new ClusterStatsMetricsMonitor(httpClient, config.getBackendState(), config.getMonitor());
         };
     }
 }
