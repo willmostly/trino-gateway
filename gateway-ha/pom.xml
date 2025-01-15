@@ -189,12 +189,6 @@
         </dependency>
 
         <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-api</artifactId>
-            <version>1.46.0</version>
-        </dependency>
-
-        <dependency>
             <groupId>io.trino</groupId>
             <artifactId>trino-parser</artifactId>
             <version>${dep.trino.version}</version>

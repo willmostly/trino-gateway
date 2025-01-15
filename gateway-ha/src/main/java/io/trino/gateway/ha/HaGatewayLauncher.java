@@ -28,6 +28,7 @@ import io.airlift.log.LogJmxModule;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeModule;
 import io.airlift.openmetrics.JmxOpenMetricsModule;
+import io.airlift.tracing.TracingModule;
 import io.airlift.units.Duration;
 import io.trino.gateway.baseapp.BaseApp;
 import io.trino.gateway.ha.config.HaGatewayConfiguration;
@@ -41,6 +42,7 @@ import java.util.List;
 import static io.trino.gateway.baseapp.BaseApp.addModules;
 import static io.trino.gateway.ha.util.ConfigurationUtils.replaceEnvironmentVariables;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNullElse;
 
 public class HaGatewayLauncher
 {
@@ -50,6 +52,7 @@ public class HaGatewayLauncher
     {
         long startTime = System.nanoTime();
 
+        String version = requireNonNullElse(HaGatewayLauncher.class.getPackage().getImplementationVersion(), "unknown");
         ImmutableList.Builder<Module> modules = ImmutableList.builder();
         modules.add(
                 new NodeModule(),
@@ -61,6 +64,7 @@ public class HaGatewayLauncher
                 new MBeanModule(),
                 new JsonModule(),
                 new JaxrsModule(),
+                new TracingModule("trino-gateway", version),
                 new BaseApp(configuration));
         modules.addAll(additionalModules);
 
