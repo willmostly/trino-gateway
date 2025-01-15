@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Module;
 import io.airlift.bootstrap.ApplicationConfigurationException;
 import io.airlift.bootstrap.Bootstrap;
-import io.airlift.event.client.EventModule;
 import io.airlift.http.server.HttpServerModule;
 import io.airlift.jaxrs.JaxrsModule;
 import io.airlift.jmx.JmxHttpModule;
@@ -54,7 +53,6 @@ public class HaGatewayLauncher
         ImmutableList.Builder<Module> modules = ImmutableList.builder();
         modules.add(
                 new NodeModule(),
-                new EventModule(),
                 new HttpServerModule(),
                 new JmxModule(),
                 new JmxHttpModule(),

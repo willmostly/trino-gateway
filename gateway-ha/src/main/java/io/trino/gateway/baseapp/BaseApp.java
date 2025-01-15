@@ -17,6 +17,8 @@ import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.log.Logger;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import io.trino.gateway.ha.clustermonitor.ForMonitor;
 import io.trino.gateway.ha.config.HaGatewayConfiguration;
 import io.trino.gateway.ha.handler.ProxyHandlerStats;
@@ -46,6 +48,7 @@ import java.util.Optional;
 import static com.google.common.collect.MoreCollectors.toOptional;
 import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
 import static io.airlift.jaxrs.JaxrsBinder.jaxrsBinder;
+import static io.airlift.tracing.Tracing.noopTracer;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
@@ -117,6 +120,10 @@ public class BaseApp
     public void configure(Binder binder)
     {
         binder.bind(HaGatewayConfiguration.class).toInstance(configuration);
+        // For io.airlift.http.server.tracing.TracingServletFilter
+        binder.bind(OpenTelemetry.class).toInstance(OpenTelemetry.noop());
+        // For io.airlift.http.server.tracing.TracingServletFilter
+        binder.bind(Tracer.class).toInstance(noopTracer());
         registerAuthFilters(binder);
         registerResources(binder);
         registerProxyResources(binder);
