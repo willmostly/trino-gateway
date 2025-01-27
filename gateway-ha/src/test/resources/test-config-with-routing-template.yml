@@ -9,14 +9,6 @@ dataStore:
   driver: org.h2.Driver
   runMigrationsEnabled: false
 
-modules:
-  - io.trino.gateway.ha.module.HaGatewayProviderModule
-  - io.trino.gateway.ha.module.ClusterStateListenerModule
-  - io.trino.gateway.ha.module.ClusterStatsMonitorModule
-
-managedApps:
-  - io.trino.gateway.ha.clustermonitor.ActiveClusterMonitor
-
 clusterStatsConfiguration:
   monitorType: INFO_API
 

@@ -13,10 +13,12 @@
  */
 package io.trino.gateway.baseapp;
 
+import com.google.common.collect.ImmutableList;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.log.Logger;
+import io.trino.gateway.ha.clustermonitor.ActiveClusterMonitor;
 import io.trino.gateway.ha.clustermonitor.ForMonitor;
 import io.trino.gateway.ha.config.HaGatewayConfiguration;
 import io.trino.gateway.ha.handler.ProxyHandlerStats;
@@ -86,7 +88,7 @@ public class BaseApp
         return null;
     }
 
-    private static void validateModules(List<Module> modules, HaGatewayConfiguration configuration)
+    private static void addDefaultRouterProviderModules(List<Module> modules, HaGatewayConfiguration configuration)
     {
         Optional<Module> routerProvider = modules.stream()
                 .filter(module -> module instanceof RouterBaseModule)
@@ -102,22 +104,37 @@ public class BaseApp
     {
         List<Module> modules = new ArrayList<>();
         if (configuration.getModules() == null) {
-            logger.warn("No modules to load.");
-            return modules;
+            logger.info("No modules to load.");
         }
-        for (String clazz : configuration.getModules()) {
-            modules.add(newModule(clazz, configuration));
+        else {
+            for (String clazz : configuration.getModules()) {
+                warnLoadingDefaultModules(clazz);
+                modules.add(newModule(clazz, configuration));
+            }
         }
-
-        validateModules(modules, configuration);
+        addDefaultRouterProviderModules(modules, configuration);
 
         return modules;
+    }
+
+    private static void warnLoadingDefaultModules(String clazz)
+    {
+        // Remove this check when user finished the migration
+        List<String> defaultModules = ImmutableList.of(
+                "io.trino.gateway.ha.module.HaGatewayProviderModule",
+                "io.trino.gateway.ha.module.ClusterStateListenerModule",
+                "io.trino.gateway.ha.module.ClusterStatsMonitorModule");
+        if (defaultModules.contains(clazz)) {
+            logger.error("Default module [%s] is already being loaded. Please remove it from the config file", clazz);
+            System.exit(1);
+        }
     }
 
     @Override
     public void configure(Binder binder)
     {
         binder.bind(HaGatewayConfiguration.class).toInstance(configuration);
+        binder.bind(ActiveClusterMonitor.class).in(Scopes.SINGLETON);
         registerAuthFilters(binder);
         registerResources(binder);
         registerProxyResources(binder);
@@ -131,11 +148,16 @@ public class BaseApp
     private static void addManagedApps(HaGatewayConfiguration configuration, Binder binder)
     {
         if (configuration.getManagedApps() == null) {
-            logger.error("No managed apps found");
+            logger.info("No managed apps found");
             return;
         }
         configuration.getManagedApps().forEach(
                 clazz -> {
+                    // Remove this check when user finished the migration
+                    if (clazz.equals("io.trino.gateway.ha.clustermonitor.ActiveClusterMonitor")) {
+                        logger.error("Default class ActiveClusterMonitor is already being loaded. Please remove it from the config file");
+                        System.exit(1);
+                    }
                     try {
                         Class<?> c = Class.forName(clazz);
                         binder.bind(c).in(Scopes.SINGLETON);
