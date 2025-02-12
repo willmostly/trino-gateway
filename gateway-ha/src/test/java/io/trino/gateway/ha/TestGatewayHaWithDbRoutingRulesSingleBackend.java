@@ -14,7 +14,10 @@
 package io.trino.gateway.ha;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import io.trino.gateway.ha.config.ProxyBackendConfiguration;
+import io.trino.gateway.ha.persistence.dao.RoutingRule;
+import io.trino.gateway.ha.persistence.dao.RoutingRuleEngine;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -28,16 +31,19 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.TrinoContainer;
 
 import java.io.File;
+import java.nio.file.NoSuchFileException;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testcontainers.utility.MountableFile.forClasspathResource;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-final class TestGatewayHaWithRoutingRulesSingleBackend
+final class TestGatewayHaWithDbRoutingRulesSingleBackend
 {
     private final OkHttpClient httpClient = new OkHttpClient();
     private TrinoContainer trino;
-    private final PostgreSQLContainer postgresql = new PostgreSQLContainer("postgres:16");
+    private final PostgreSQLContainer<?> postgresql = new PostgreSQLContainer<>("postgres:16");
     int routerPort = 21001 + (int) (Math.random() * 1000);
 
     @BeforeAll
@@ -53,13 +59,32 @@ final class TestGatewayHaWithRoutingRulesSingleBackend
 
         // seed database
         File testConfigFile =
-                HaGatewayTestUtils.buildGatewayConfig(postgresql, routerPort, "test-config-with-routing-template.yml");
+                HaGatewayTestUtils.buildGatewayConfig(postgresql, routerPort, "test-config-with-db-routing-rules.yml");
         // Start Gateway
         String[] args = {testConfigFile.getAbsolutePath()};
         HaGatewayLauncher.main(args);
         // Now populate the backend
         HaGatewayTestUtils.setUpBackend(
                 "trino1", "http://localhost:" + backendPort, "externalUrl", true, "system", routerPort);
+
+        String systemRule = """
+                {
+                  "name": "system-group",
+                  "description": "capture queries to system catalog"
+                  "condition": "trinoQueryProperties.getCatalogs().contains(\\\\"system\\\\")"
+                  "actions": ["result.put(RulesRoutingGroupSelector.RESULTS_ROUTING_GROUP_KEY, \\\\"system\\\\")"]
+                """;
+
+        RequestBody requestBody = RequestBody.create(systemRule, MediaType.parse("application/json; charset=utf-8"));
+        Request request = new Request.Builder()
+                .url("http://localhost:" + routerPort + "/webapp/createRoutingRule")
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody)
+                .build();
+        Response response = httpClient.newCall(request).execute();
+        if (!response.isSuccessful()) {
+            throw new RuntimeException("Rule creation failed with response code " +response.code() + " and body " + response.body());
+        }
     }
 
     @Test

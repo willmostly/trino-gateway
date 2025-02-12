@@ -19,7 +19,8 @@ import io.airlift.json.JsonCodec;
 import io.trino.gateway.ha.HaGatewayLauncher;
 import io.trino.gateway.ha.HaGatewayTestUtils;
 import io.trino.gateway.ha.config.UIConfiguration;
-import io.trino.gateway.ha.domain.RoutingRule;
+import io.trino.gateway.ha.persistence.dao.RoutingRule;
+import io.trino.gateway.ha.persistence.dao.RoutingRuleEngine;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -101,7 +102,12 @@ final class TestRoutingAPI
             throws Exception
     {
         //Update routing rules with a new rule
-        RoutingRule updatedRoutingRules = new RoutingRule("airflow", "if query from airflow, route to adhoc group", 0, List.of("result.put(\"routingGroup\", \"adhoc\")"), "request.getHeader(\"X-Trino-Source\") == \"JDBC\"");
+        RoutingRule updatedRoutingRules = new RoutingRule(
+                "airflow",
+                "if query from airflow, route to adhoc group",
+                0, "request.getHeader(\"X-Trino-Source\") == \"JDBC\"",
+                List.of("result.put(\"routingGroup\", \"adhoc\")"),
+                RoutingRuleEngine.MVEL);
         RequestBody requestBody = RequestBody.create(OBJECT_MAPPER.writeValueAsString(updatedRoutingRules), MediaType.parse("application/json; charset=utf-8"));
         Request request = new Request.Builder()
                         .url("http://localhost:" + routerPort + "/webapp/updateRoutingRules")
@@ -135,7 +141,12 @@ final class TestRoutingAPI
         assertThat(routingRules[0].actions()).first().isEqualTo("result.put(\"routingGroup\", \"adhoc\")");
 
         //Revert back to old routing rules to avoid any test failures
-        RoutingRule revertRoutingRules = new RoutingRule("airflow", "if query from airflow, route to etl group", 0, List.of("result.put(\"routingGroup\", \"etl\")"), "request.getHeader(\"X-Trino-Source\") == \"airflow\"");
+        RoutingRule revertRoutingRules = new RoutingRule(
+                "airflow",
+                "if query from airflow, route to etl group",
+                0, "request.getHeader(\"X-Trino-Source\") == \"airflow\"",
+                List.of("result.put(\"routingGroup\", \"etl\")"),
+                null);
         RequestBody requestBody3 = RequestBody.create(OBJECT_MAPPER.writeValueAsString(revertRoutingRules), MediaType.parse("application/json; charset=utf-8"));
         Request request3 = new Request.Builder()
                 .url("http://localhost:" + routerPort + "/webapp/updateRoutingRules")

@@ -19,7 +19,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLParser;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import io.trino.gateway.ha.config.HaGatewayConfiguration;
-import io.trino.gateway.ha.domain.RoutingRule;
+import io.trino.gateway.ha.persistence.dao.RoutingRule;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -33,16 +33,18 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
 
-public class RoutingRulesManager
+public class FileBasedRoutingRulesManager
+    implements IRoutingRulesManager
 {
     private final String rulesConfigPath;
 
     @Inject
-    public RoutingRulesManager(HaGatewayConfiguration configuration)
+    public FileBasedRoutingRulesManager(HaGatewayConfiguration configuration)
     {
         this.rulesConfigPath = configuration.getRoutingRules().getRulesConfigPath();
     }
 
+    @Override
     public List<RoutingRule> getRoutingRules()
     {
         YAMLFactory yamlFactory = new YAMLFactory();
@@ -62,6 +64,7 @@ public class RoutingRulesManager
         }
     }
 
+    @Override
     public synchronized List<RoutingRule> updateRoutingRule(RoutingRule routingRule)
     {
         ImmutableList.Builder<RoutingRule> updatedRoutingRulesBuilder = ImmutableList.builder();
@@ -88,5 +91,17 @@ public class RoutingRulesManager
             throw new UncheckedIOException("Failed to parse or update routing rules configuration form path : " + rulesConfigPath, e);
         }
         return updatedRoutingRulesBuilder.build();
+    }
+
+    @Override
+    public void deleteRoutingRule(String name)
+    {
+        throw new RuntimeException("Delete is not supported for file based routing rules");
+    }
+
+    @Override
+    public void createRoutingRule(RoutingRule routingRule)
+    {
+        throw new RuntimeException("Create is not supported for file based routing rules");
     }
 }

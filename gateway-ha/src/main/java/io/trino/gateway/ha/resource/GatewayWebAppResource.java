@@ -20,7 +20,7 @@ import io.trino.gateway.ha.config.HaGatewayConfiguration;
 import io.trino.gateway.ha.config.ProxyBackendConfiguration;
 import io.trino.gateway.ha.config.UIConfiguration;
 import io.trino.gateway.ha.domain.Result;
-import io.trino.gateway.ha.domain.RoutingRule;
+import io.trino.gateway.ha.persistence.dao.RoutingRule;
 import io.trino.gateway.ha.domain.TableData;
 import io.trino.gateway.ha.domain.request.GlobalPropertyRequest;
 import io.trino.gateway.ha.domain.request.QueryDistributionRequest;
@@ -37,7 +37,7 @@ import io.trino.gateway.ha.router.GatewayBackendManager;
 import io.trino.gateway.ha.router.HaGatewayManager;
 import io.trino.gateway.ha.router.QueryHistoryManager;
 import io.trino.gateway.ha.router.ResourceGroupsManager;
-import io.trino.gateway.ha.router.RoutingRulesManager;
+import io.trino.gateway.ha.router.FileBasedRoutingRulesManager;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -75,7 +75,7 @@ public class GatewayWebAppResource
     private final ResourceGroupsManager resourceGroupsManager;
     // TODO Avoid putting mutable objects in fields
     private final UIConfiguration uiConfiguration;
-    private final RoutingRulesManager routingRulesManager;
+    private final FileBasedRoutingRulesManager routingRulesManager;
 
     @Inject
     public GatewayWebAppResource(
@@ -83,7 +83,7 @@ public class GatewayWebAppResource
             QueryHistoryManager queryHistoryManager,
             BackendStateManager backendStateManager,
             ResourceGroupsManager resourceGroupsManager,
-            RoutingRulesManager routingRulesManager,
+            FileBasedRoutingRulesManager routingRulesManager,
             HaGatewayConfiguration configuration)
     {
         this.gatewayBackendManager = requireNonNull(gatewayBackendManager, "gatewayBackendManager is null");
@@ -460,6 +460,16 @@ public class GatewayWebAppResource
     {
         List<RoutingRule> routingRulesList = routingRulesManager.updateRoutingRule(routingRule);
         return Response.ok(Result.ok(routingRulesList)).build();
+    }
+
+    @POST
+    @RolesAllowed("ADMIN")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("/createRoutingRule")
+    public Response createRoutingRule(RoutingRule routingRule)
+    {
+        routingRulesManager.createRoutingRule(routingRule);
+        return Response.ok().build();
     }
 
     @GET

@@ -16,6 +16,7 @@ package io.trino.gateway.ha.router;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
+import org.mvel2.MVEL;
 import org.mvel2.ParserContext;
 import org.mvel2.debug.DebugTools;
 
@@ -59,6 +60,17 @@ public class MVELRoutingRule
         this.actions = actions.stream().map(this::compileExpressionIfNecessary).collect(toImmutableList());
     }
 
+    public MVELRoutingRule(String name, String description, Integer priority, String condition, List<String> actions)
+    {
+        initializeParserContext(parserContext);
+
+        this.name = requireNonNull(name, "name is null");
+        this.description = requireNonNullElse(description, "");
+        this.priority = requireNonNullElse(priority, 0);
+        this.condition = requireNonNull(compileExpression(condition, parserContext));
+        this.actions = actions.stream().map(a -> compileExpression(a, parserContext)).collect(toImmutableList());
+    }
+
     private Serializable compileExpressionIfNecessary(Serializable expression)
     {
         if (expression instanceof String stringExpression) {
@@ -87,7 +99,7 @@ public class MVELRoutingRule
         parserContext.addImport(String.class);
         parserContext.addImport(StringBuffer.class);
         parserContext.addImport(StringBuilder.class);
-        parserContext.addImport(FileBasedRoutingGroupSelector.class);
+        parserContext.addImport(RulesRoutingGroupSelector.class);
     }
 
     @Override

@@ -14,10 +14,13 @@
 package io.trino.gateway.ha.router;
 
 import io.airlift.http.client.HttpClient;
-import io.airlift.units.Duration;
+import io.trino.gateway.ha.config.HaGatewayConfiguration;
 import io.trino.gateway.ha.config.RequestAnalyzerConfig;
+import io.trino.gateway.ha.config.RoutingRulesConfiguration;
 import io.trino.gateway.ha.config.RulesExternalConfiguration;
+import io.trino.gateway.ha.persistence.dao.RoutingRulesDao;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jdbi.v3.core.Jdbi;
 
 /**
  * RoutingGroupSelector provides a way to match an HTTP request to a Gateway routing group.
@@ -39,9 +42,19 @@ public interface RoutingGroupSelector
      * Routing group selector that uses routing engine rules
      * to determine the right routing group.
      */
-    static RoutingGroupSelector byRoutingRulesEngine(String rulesConfigPath, Duration rulesRefreshPeriod, RequestAnalyzerConfig requestAnalyzerConfig)
+    static RoutingGroupSelector byRoutingRulesEngine(HaGatewayConfiguration configuration)
     {
-        return new FileBasedRoutingGroupSelector(rulesConfigPath, rulesRefreshPeriod, requestAnalyzerConfig);
+        RoutingRulesConfiguration routingRulesConfig = configuration.getRoutingRules();
+        IRoutingRulesManager routingRulesManager = switch (routingRulesConfig.getRulesType()) {
+            case FILE -> new FileBasedRoutingRulesManager(configuration);
+            case DB -> {
+                Jdbi jdbi = Jdbi.create(configuration.getDataStore().getJdbcUrl(), configuration.getDataStore().getUser(), configuration.getDataStore().getPassword());
+                yield new DbRoutingRulesManager(jdbi.onDemand(RoutingRulesDao.class));
+            }
+            default -> throw new RuntimeException("No routing manager for " + routingRulesConfig.getRulesType());
+        };
+        return new RulesRoutingGroupSelector(routingRulesManager, routingRulesConfig.getRulesRefreshPeriod(), configuration.getRequestAnalyzerConfig());
+
     }
 
     /**
