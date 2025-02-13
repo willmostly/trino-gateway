@@ -44,15 +44,8 @@ public interface RoutingGroupSelector
      */
     static RoutingGroupSelector byRoutingRulesEngine(HaGatewayConfiguration configuration)
     {
+        IRoutingRulesManager routingRulesManager = new ForwardingRoutingRulesManager(configuration);
         RoutingRulesConfiguration routingRulesConfig = configuration.getRoutingRules();
-        IRoutingRulesManager routingRulesManager = switch (routingRulesConfig.getRulesType()) {
-            case FILE -> new FileBasedRoutingRulesManager(configuration);
-            case DB -> {
-                Jdbi jdbi = Jdbi.create(configuration.getDataStore().getJdbcUrl(), configuration.getDataStore().getUser(), configuration.getDataStore().getPassword());
-                yield new DbRoutingRulesManager(jdbi.onDemand(RoutingRulesDao.class));
-            }
-            default -> throw new RuntimeException("No routing manager for " + routingRulesConfig.getRulesType());
-        };
         return new RulesRoutingGroupSelector(routingRulesManager, routingRulesConfig.getRulesRefreshPeriod(), configuration.getRequestAnalyzerConfig());
 
     }

@@ -20,7 +20,6 @@ import io.trino.gateway.ha.config.HaGatewayConfiguration;
 import io.trino.gateway.ha.config.ProxyBackendConfiguration;
 import io.trino.gateway.ha.config.UIConfiguration;
 import io.trino.gateway.ha.domain.Result;
-import io.trino.gateway.ha.persistence.dao.RoutingRule;
 import io.trino.gateway.ha.domain.TableData;
 import io.trino.gateway.ha.domain.request.GlobalPropertyRequest;
 import io.trino.gateway.ha.domain.request.QueryDistributionRequest;
@@ -32,12 +31,14 @@ import io.trino.gateway.ha.domain.request.ResourceGroupsRequest;
 import io.trino.gateway.ha.domain.request.SelectorsRequest;
 import io.trino.gateway.ha.domain.response.BackendResponse;
 import io.trino.gateway.ha.domain.response.DistributionResponse;
+import io.trino.gateway.ha.persistence.dao.RoutingRule;
 import io.trino.gateway.ha.router.BackendStateManager;
+import io.trino.gateway.ha.router.ForwardingRoutingRulesManager;
 import io.trino.gateway.ha.router.GatewayBackendManager;
 import io.trino.gateway.ha.router.HaGatewayManager;
+import io.trino.gateway.ha.router.IRoutingRulesManager;
 import io.trino.gateway.ha.router.QueryHistoryManager;
 import io.trino.gateway.ha.router.ResourceGroupsManager;
-import io.trino.gateway.ha.router.FileBasedRoutingRulesManager;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -75,7 +76,7 @@ public class GatewayWebAppResource
     private final ResourceGroupsManager resourceGroupsManager;
     // TODO Avoid putting mutable objects in fields
     private final UIConfiguration uiConfiguration;
-    private final FileBasedRoutingRulesManager routingRulesManager;
+    private final IRoutingRulesManager routingRulesManager;
 
     @Inject
     public GatewayWebAppResource(
@@ -83,7 +84,7 @@ public class GatewayWebAppResource
             QueryHistoryManager queryHistoryManager,
             BackendStateManager backendStateManager,
             ResourceGroupsManager resourceGroupsManager,
-            FileBasedRoutingRulesManager routingRulesManager,
+            ForwardingRoutingRulesManager routingRulesManager,
             HaGatewayConfiguration configuration)
     {
         this.gatewayBackendManager = requireNonNull(gatewayBackendManager, "gatewayBackendManager is null");

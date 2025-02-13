@@ -32,3 +32,4 @@ requestAnalyzerConfig:
 routingRules:
     rulesEngineEnabled: true
     rulesType: "DB"
+    rulesRefreshPeriod: "1s"

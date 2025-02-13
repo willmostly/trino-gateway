@@ -59,7 +59,7 @@ final class TestGatewayHaWithDbRoutingRulesSingleBackend
 
         // seed database
         File testConfigFile =
-                HaGatewayTestUtils.buildGatewayConfig(postgresql, routerPort, "test-config-with-db-routing-rules.yml");
+                HaGatewayTestUtils.buildGatewayConfig(postgresql, routerPort, "test-config-with-db-routing-rules.yaml");
         // Start Gateway
         String[] args = {testConfigFile.getAbsolutePath()};
         HaGatewayLauncher.main(args);
@@ -70,9 +70,10 @@ final class TestGatewayHaWithDbRoutingRulesSingleBackend
         String systemRule = """
                 {
                   "name": "system-group",
-                  "description": "capture queries to system catalog"
-                  "condition": "trinoQueryProperties.getCatalogs().contains(\\\\"system\\\\")"
-                  "actions": ["result.put(RulesRoutingGroupSelector.RESULTS_ROUTING_GROUP_KEY, \\\\"system\\\\")"]
+                  "description": "capture queries to system catalog",
+                  "condition": "trinoQueryProperties.getCatalogs().contains(\\"system\\")",
+                  "actions": ["result.put(RulesRoutingGroupSelector.RESULTS_ROUTING_GROUP_KEY, \\"system\\")"]
+                }
                 """;
 
         RequestBody requestBody = RequestBody.create(systemRule, MediaType.parse("application/json; charset=utf-8"));
@@ -83,8 +84,9 @@ final class TestGatewayHaWithDbRoutingRulesSingleBackend
                 .build();
         Response response = httpClient.newCall(request).execute();
         if (!response.isSuccessful()) {
-            throw new RuntimeException("Rule creation failed with response code " +response.code() + " and body " + response.body());
+            throw new RuntimeException("Rule creation failed with response code " +response.code() + " and body " + response.body().string());
         }
+        Thread.sleep(2000); //ensure rule is loaded
     }
 
     @Test

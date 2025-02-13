@@ -14,10 +14,12 @@ implements IRoutingRulesManager
     {
         this.routingRulesDao = routingRulesDao;
     }
+
     @Override
     public List<RoutingRule> getRoutingRules()
     {
-        return routingRulesDao.getAll();
+        List<RoutingRule> rules = routingRulesDao.getAll();
+        return rules;
     }
 
     @Override

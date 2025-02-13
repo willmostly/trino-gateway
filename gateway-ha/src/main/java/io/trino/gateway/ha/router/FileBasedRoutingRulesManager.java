@@ -38,7 +38,6 @@ public class FileBasedRoutingRulesManager
 {
     private final String rulesConfigPath;
 
-    @Inject
     public FileBasedRoutingRulesManager(HaGatewayConfiguration configuration)
     {
         this.rulesConfigPath = configuration.getRoutingRules().getRulesConfigPath();
